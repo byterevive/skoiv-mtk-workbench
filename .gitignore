@@ -1,0 +1,21 @@
+# Future implementation artifacts
+node_modules/
+target/
+.venv/
+__pycache__/
+*.pyc
+
+# Local runtime data
+sessions/local/
+backups/
+logs/
+*.log
+
+# IDE / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# review specific files
+temp-review/
