@@ -1,0 +1,17 @@
+{
+  "name": "skoiv-mtk-workbench",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Skoiv MTK Workbench monorepo (desktop shell + Python worker)",
+  "license": "GPL-3.0-only",
+  "scripts": {
+    "dev": "pnpm --filter desktop dev",
+    "build": "pnpm --filter desktop build",
+    "typecheck": "pnpm --filter desktop typecheck",
+    "tauri": "pnpm --filter desktop tauri"
+  },
+  "packageManager": "pnpm@12.9.1",
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
+  }
+}
