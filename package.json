@@ -10,8 +10,5 @@
     "typecheck": "pnpm --filter desktop typecheck",
     "tauri": "pnpm --filter desktop tauri"
   },
-  "packageManager": "pnpm@12.9.1",
-  "pnpm": {
-    "onlyBuiltDependencies": ["esbuild"]
-  }
+  "packageManager": "pnpm@12.9.1"
 }

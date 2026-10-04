@@ -1,2 +1,6 @@
 packages:
   - "apps/*"
+
+# Build scripts that are trusted to run during install.
+allowBuilds:
+  esbuild: true
