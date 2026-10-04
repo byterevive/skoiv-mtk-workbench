@@ -8,6 +8,7 @@ on:
 permissions:
   contents: read
   issues: write
+  checks: write
 
 jobs:
   worker:
@@ -71,21 +72,25 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -o pipefail
-          if cargo check 2>&1 | tee cargo-out.txt; then
+          if cargo check 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | tee cargo-out.txt; then
             echo "cargo check passed"
           else
-            echo "::error::cargo check failed - compiler diagnostics follow"
-            grep -E "^(error|warning)(\[|:)" -A 6 cargo-out.txt | head -120 | \
-              sed 's/^/::error::/' || true
-            # Fallback channel: publish the log tail in an issue so the
-            # diagnostics are readable even where workflow logs are not.
-            tail -c 40000 cargo-out.txt > cargo-tail.txt
-            gh issue create \
-              --title "[ci] cargo check failed on ${{ github.sha }}" \
-              --body-file cargo-tail.txt \
-              --label "ci-log" 2>/dev/null || \
-            gh issue create \
-              --title "[ci] cargo check failed on ${{ github.sha }}" \
-              --body-file cargo-tail.txt || true
+            echo "::error::cargo check failed - raw output tail follows"
+            # Always surface the raw tail (<=10 annotations per step are kept).
+            tail -n 8 cargo-out.txt | sed 's/^/::error::/' || true
+            # Publish full diagnostics as a check-run summary (readable via API).
+            tail -c 48000 cargo-out.txt > cargo-tail.txt
+            {
+              echo '```'
+              cat cargo-tail.txt
+              echo '```'
+            } > cargo-summary.md
+            gh api "repos/${{ github.repository }}/check-runs" \
+              -f name="cargo-diagnostics" \
+              -f head_sha="${{ github.sha }}" \
+              -f status=completed \
+              -f conclusion=failure \
+              -f "output[title]=cargo check failed" \
+              -F "output[summary]=@cargo-summary.md" || true
             exit 1
           fi
