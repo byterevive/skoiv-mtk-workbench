@@ -7,8 +7,6 @@
 
 mod worker;
 
-use tauri::Manager;
-
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())

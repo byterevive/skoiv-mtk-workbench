@@ -65,7 +65,8 @@ fn handle_worker_line(app: &AppHandle, line: &str) {
         };
 
         let sender = {
-            let mut pending = app.state::<WorkerState>().pending.lock().unwrap();
+            let state = app.state::<WorkerState>();
+            let mut pending = state.pending.lock().unwrap();
             pending.remove(&id)
         };
         if let Some(sender) = sender {
@@ -82,7 +83,7 @@ fn handle_worker_line(app: &AppHandle, line: &str) {
 pub async fn spawn_worker(app: &AppHandle) -> Result<(), String> {
     {
         let state = app.state::<WorkerState>();
-        let mut child = state.child.lock().unwrap();
+        let child = state.child.lock().unwrap();
         if child.is_some() {
             return Ok(());
         }
