@@ -1,0 +1,46 @@
+[project]
+name = "skoiv-worker"
+version = "0.1.0"
+description = "Skoiv MTK Workbench Python worker: mtkclient adapter, GPT parsing, backup engine, and evidence generation."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "GPL-3.0-only" }
+authors = [{ name = "Skoiv Labs" }]
+dependencies = []
+
+[project.optional-dependencies]
+# mtkclient is not published on PyPI; it is pinned from its GPLv3 upstream.
+# libusb-package vendors the libusb shared library that pyusb loads at
+# runtime (required for the frozen Windows worker).
+device = [
+  "mtkclient @ git+https://github.com/bkerler/mtkclient.git@v2.1.4.1",
+  "libusb-package>=1.0.30",
+]
+dev = [
+  "pytest>=8.0",
+  "pyinstaller>=6.0",
+]
+
+[project.scripts]
+skoiv-worker = "skoiv_worker.__main__:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/skoiv_worker"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.uv]
+# mtkclient declares PySide6/shiboken6 for its optional GUI. The Workbench
+# worker is headless (mtkconfig falls back to a QObject stub), so those
+# transitive dependencies are stripped to keep installs and the frozen
+# Windows worker lean.
+override-dependencies = ["pyside6; sys_platform == 'never'", "shiboken6; sys_platform == 'never'"]

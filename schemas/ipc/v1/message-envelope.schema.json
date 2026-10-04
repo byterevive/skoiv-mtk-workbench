@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skoiv.dev/schemas/ipc/v1/message-envelope.schema.json",
+  "title": "Skoiv MTK Workbench IPC message envelope v1",
+  "description": "Structured JSON messages exchanged between the desktop shell and the Python worker over stdio (one JSON object per line).",
+  "oneOf": [
+    { "$ref": "#/$defs/request" },
+    { "$ref": "#/$defs/response" },
+    { "$ref": "#/$defs/event" }
+  ],
+  "$defs": {
+    "request": {
+      "type": "object",
+      "required": ["v", "type", "id", "method"],
+      "properties": {
+        "v": { "const": 1 },
+        "type": { "const": "request" },
+        "id": { "type": "string", "minLength": 1 },
+        "method": {
+          "type": "string",
+          "enum": [
+            "ping",
+            "adapter.info",
+            "device.detect",
+            "gpt.read",
+            "shutdown"
+          ]
+        },
+        "params": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+    "response": {
+      "type": "object",
+      "required": ["v", "type", "id", "ok"],
+      "properties": {
+        "v": { "const": 1 },
+        "type": { "const": "response" },
+        "id": { "type": "string", "minLength": 1 },
+        "ok": { "type": "boolean" },
+        "result": { "type": "object" },
+        "error": {
+          "type": "object",
+          "required": ["code", "message"],
+          "properties": {
+            "code": { "type": "string" },
+            "message": { "type": "string" },
+            "detail": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "event": {
+      "type": "object",
+      "required": ["v", "type", "event"],
+      "properties": {
+        "v": { "const": 1 },
+        "type": { "const": "event" },
+        "event": {
+          "type": "string",
+          "enum": [
+            "worker-health",
+            "log",
+            "operation-started",
+            "operation-progress",
+            "operation-completed",
+            "operation-failed",
+            "warning"
+          ]
+        },
+        "data": { "type": "object" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
