@@ -25,6 +25,17 @@ An open-source, evidence-driven MediaTek recovery, diagnostics, backup, firmware
 - MTK engine: mtkclient behind a Workbench-owned adapter
 - Desktop/worker IPC: structured JSON messages over stdio
 
+## Current status
+
+The 0.1 vertical slice is implemented: Python worker (IPC v1, GPT parser with
+evidence hashes, mock + mtkclient adapters), Tauri 2 desktop shell with the
+React UI, PyInstaller sidecar packaging, and a GitHub Actions pipeline that
+builds the Windows NSIS installer (`release-windows.yml`). The UI can be run
+against a browser mock (`pnpm dev`) or the real worker (`pnpm tauri dev`).
+
+See `worker/README.md`, `apps/desktop/README.md`, and
+`docs/development/release.md` for development and release workflows.
+
 ## v0.1 boundary
 
 Version 0.1 is intentionally read-only with respect to device partitions. Its core capabilities are planned to include device detection, GPT inspection, selective BROM backup, preloader inspection/splitting, DA inspection, firmware-package inspection, firmware consistency checks, command preview, persistent logs, evidence capture, sessions, and learning content.

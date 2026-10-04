@@ -5,6 +5,15 @@ target/
 __pycache__/
 *.pyc
 
+# Build outputs
+dist/
+build/
+worker/dist/
+worker/build/
+apps/desktop/src-tauri/binaries/
+apps/desktop/src-tauri/gen/
+release-out/
+
 # Local runtime data
 sessions/local/
 backups/

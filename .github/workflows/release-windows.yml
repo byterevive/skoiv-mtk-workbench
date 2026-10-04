@@ -1,0 +1,106 @@
+name: Release Windows
+
+# Builds the Windows release: PyInstaller-frozen Python worker (mtkclient
+# sidecar) + Tauri 2 desktop shell, packaged as an NSIS installer .exe.
+#
+# - Push a tag `v*` to publish a GitHub Release with the artifacts.
+# - Run manually (workflow_dispatch) to build and upload artifacts only.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    name: Build Windows exe
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+
+      - name: Install worker deps (mtkclient + libusb + pyinstaller)
+        working-directory: worker
+        run: uv sync --extra dev --extra device
+
+      - name: Worker tests
+        working-directory: worker
+        run: uv run --no-sync python -m pytest -q
+
+      - name: Freeze worker (PyInstaller)
+        working-directory: worker
+        run: uv run --no-sync pyinstaller skoiv-worker.spec --noconfirm
+
+      - name: Place worker sidecar for Tauri
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path apps/desktop/src-tauri/binaries | Out-Null
+          Copy-Item worker/dist/skoiv-worker.exe `
+            apps/desktop/src-tauri/binaries/skoiv-worker-x86_64-pc-windows-msvc.exe
+
+      - name: Install UI deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Tauri app (NSIS installer)
+        run: pnpm tauri build
+
+      - name: Collect artifacts
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path release-out | Out-Null
+          Copy-Item "apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe" release-out/
+          Copy-Item worker/dist/skoiv-worker.exe release-out/
+          Get-ChildItem release-out | ForEach-Object {
+            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
+            "$hash  $($_.Name)"
+          } | Out-File -Encoding ascii release-out/SHA256SUMS.txt
+          Get-ChildItem release-out
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: skoiv-mtk-workbench-windows
+          path: release-out/*
+          if-no-files-found: error
+
+      - name: Publish GitHub Release (tags only)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-out/*
+          generate_release_notes: true
+          body: |
+            ## Skoiv MTK Workbench — Windows build
+
+            - `*-setup.exe` — NSIS installer (desktop shell + bundled Python worker).
+            - `skoiv-worker.exe` — the frozen standalone worker (also bundled in the installer).
+            - `SHA256SUMS.txt` — checksums for both artifacts.
+
+            ### First run on Windows
+            1. The installer is **unsigned**, so SmartScreen may warn — choose "More info → Run anyway" only if you downloaded it from this repository's Releases page.
+            2. For device access, bind the MediaTek BROM/preloader USB interface to **WinUSB** (e.g. with [Zadig](https://zadig.akeo.ie/)). Without this the app cannot see the device.
+            3. Version 0.1 is **read-only** with respect to device partitions.
+
+            ### License
+            GPL-3.0-only. Corresponding source: this repository at the release tag, plus
+            [bkerler/mtkclient](https://github.com/bkerler/mtkclient) at its pinned tag (GPLv3).
