@@ -223,7 +223,7 @@ class MockTransport implements Transport {
         case "ping":
           result = {
             pong: true,
-            worker_version: "0.1.0 (browser mock)",
+            worker_version: "0.2.0 (browser mock)",
             protocol_version: 1,
             python: "n/a",
             uptime_s: 0,
