@@ -19,6 +19,7 @@ device = [
 dev = [
   "pytest>=8.0",
   "pyinstaller>=6.0",
+  "pycryptodome>=3.19",
 ]
 
 [project.scripts]

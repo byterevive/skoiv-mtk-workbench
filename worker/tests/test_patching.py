@@ -54,6 +54,7 @@ class TestPatchMd1img:
 
 class TestModulusFromPem:
     def test_roundtrip_from_generated_key(self):
+        pytest.importorskip("Crypto.PublicKey.RSA")
         from Crypto.PublicKey import RSA
 
         key = RSA.generate(2048)
@@ -62,11 +63,34 @@ class TestModulusFromPem:
         assert modulus == key.n.to_bytes(256, "big")
 
     def test_public_pem(self):
+        pytest.importorskip("Crypto.PublicKey.RSA")
         from Crypto.PublicKey import RSA
 
         key = RSA.generate(2048)
         pem = key.publickey().export_key().decode()
         assert modulus_from_pem(pem) == key.n.to_bytes(256, "big")
+
+    def test_der_fallback_without_pycryptodome(self, monkeypatch):
+        """The dependency-free ASN.1 scan path must also extract the modulus."""
+        import base64
+
+        import skoiv_worker.patching as patching
+
+        class _NoCrypto:
+            pass
+
+        # Force the fallback branch even when pycryptodome is installed.
+        monkeypatch.setitem(__import__("sys").modules, "Crypto", None)
+        monkeypatch.setitem(__import__("sys").modules, "Crypto.PublicKey", None)
+
+        modulus = bytes(range(256))
+        der = b"\x30\x82\x01\x22" + b"\x02\x82\x01\x01" + modulus + b"\x02\x03\x01\x00\x01"
+        pem = (
+            "-----BEGIN PUBLIC KEY-----\n"
+            + base64.encodebytes(der).decode()
+            + "-----END PUBLIC KEY-----\n"
+        )
+        assert patching.modulus_from_pem(pem) == modulus
 
     def test_rejects_garbage(self):
         with pytest.raises(PatchError):

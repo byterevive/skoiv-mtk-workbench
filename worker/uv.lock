@@ -322,6 +322,7 @@ source = { editable = "." }
 
 [package.optional-dependencies]
 dev = [
+    { name = "pycryptodome" },
     { name = "pyinstaller" },
     { name = "pytest" },
 ]
@@ -334,6 +335,7 @@ device = [
 requires-dist = [
     { name = "libusb-package", marker = "extra == 'device'", specifier = ">=1.0.30" },
     { name = "mtkclient", marker = "extra == 'device'", git = "https://github.com/bkerler/mtkclient.git?rev=v2.1.4.1" },
+    { name = "pycryptodome", marker = "extra == 'dev'", specifier = ">=3.19" },
     { name = "pyinstaller", marker = "extra == 'dev'", specifier = ">=6.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
 ]
