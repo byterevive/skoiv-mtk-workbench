@@ -62,5 +62,15 @@ jobs:
       - name: Build frontend (generate_context embeds dist/)
         run: pnpm build
       - name: cargo check
-        run: cargo check --locked || cargo check
         working-directory: apps/desktop/src-tauri
+        run: |
+          set -o pipefail
+          if cargo check 2>&1 | tee cargo-out.txt; then
+            echo "cargo check passed"
+          else
+            # Surface compiler diagnostics as workflow annotations so they are
+            # visible in the run summary even when log download is restricted.
+            grep -E "^(error|warning)(\[|:)" -A 8 cargo-out.txt | head -160 | \
+              sed 's/^/::error title=cargo check::/' || true
+            exit 1
+          fi
