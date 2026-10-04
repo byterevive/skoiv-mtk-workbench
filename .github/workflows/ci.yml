@@ -5,6 +5,10 @@ on:
     branches: ["main", "arena/**"]
   pull_request:
 
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   worker:
     name: Worker tests (Python)
@@ -63,14 +67,25 @@ jobs:
         run: pnpm build
       - name: cargo check
         working-directory: apps/desktop/src-tauri
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -o pipefail
           if cargo check 2>&1 | tee cargo-out.txt; then
             echo "cargo check passed"
           else
-            # Surface compiler diagnostics as workflow annotations so they are
-            # visible in the run summary even when log download is restricted.
-            grep -E "^(error|warning)(\[|:)" -A 8 cargo-out.txt | head -160 | \
-              sed 's/^/::error title=cargo check::/' || true
+            echo "::error::cargo check failed - compiler diagnostics follow"
+            grep -E "^(error|warning)(\[|:)" -A 6 cargo-out.txt | head -120 | \
+              sed 's/^/::error::/' || true
+            # Fallback channel: publish the log tail in an issue so the
+            # diagnostics are readable even where workflow logs are not.
+            tail -c 40000 cargo-out.txt > cargo-tail.txt
+            gh issue create \
+              --title "[ci] cargo check failed on ${{ github.sha }}" \
+              --body-file cargo-tail.txt \
+              --label "ci-log" 2>/dev/null || \
+            gh issue create \
+              --title "[ci] cargo check failed on ${{ github.sha }}" \
+              --body-file cargo-tail.txt || true
             exit 1
           fi
