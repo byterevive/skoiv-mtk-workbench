@@ -3,6 +3,8 @@ import StatusBar from "./components/StatusBar";
 import DevicePanel from "./components/DevicePanel";
 import GptPanel from "./components/GptPanel";
 import LogPanel from "./components/LogPanel";
+import ServicePanel from "./components/ServicePanel";
+import BackupPanel from "./components/BackupPanel";
 import { createTransport, getTransportMode, type Transport } from "./transport";
 import type {
   AdapterInfo,
@@ -23,6 +25,7 @@ export default function App() {
   const [gpt, setGpt] = useState<GptResult | null>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [busy, setBusy] = useState(false);
+  const [tab, setTab] = useState<"gpt" | "service" | "backups">("gpt");
   const transportRef = useRef<Transport | null>(null);
   const logSeq = useRef(0);
 
@@ -116,16 +119,45 @@ export default function App() {
       <main className="layout">
         <div className="col">
           <DevicePanel detect={detect} busy={busy} onDetect={onDetect} />
-          <GptPanel gpt={gpt} busy={busy} onRead={onReadGpt} />
+          <div className="panel">
+            <div className="panel-head">
+              <h2>Workbench</h2>
+              <div style={{ display: "flex", gap: 6 }}>
+                <button className={`btn ${tab === "gpt" ? "" : "secondary"}`} onClick={() => setTab("gpt")}>
+                  GPT
+                </button>
+                <button className={`btn ${tab === "service" ? "" : "secondary"}`} onClick={() => setTab("service")}>
+                  Service
+                </button>
+                <button className={`btn ${tab === "backups" ? "" : "secondary"}`} onClick={() => setTab("backups")}>
+                  Backups
+                </button>
+              </div>
+            </div>
+            {tab === "gpt" && <GptPanel gpt={gpt} busy={busy} onRead={onReadGpt} />}
+            {tab === "service" && (
+              <ServicePanel
+                transport={transportRef.current!}
+                log={(level, message) => pushLog(level, message)}
+              />
+            )}
+            {tab === "backups" && (
+              <BackupPanel
+                transport={transportRef.current!}
+                log={(level, message) => pushLog(level, message)}
+              />
+            )}
+          </div>
         </div>
         <LogPanel entries={logs} onClear={() => setLogs([])} />
       </main>
 
       <footer className="footer">
-        v0.1 is read-only with respect to device partitions — no write or erase operations are
-        exposed. Risk classes follow the safety policy: <span className="risk risk-red">red</span>{" "}
-        boot-critical · <span className="risk risk-yellow">yellow</span> identity/calibration ·{" "}
-        <span className="risk risk-green">green</span> ordinary.
+        Mutations run the safety pipeline: plan → confirm token → auto-backup → execute →
+        read-back verify. <span className="risk risk-red">red</span> ops additionally require an
+        attestation and typed confirmation · <span className="risk risk-yellow">yellow</span> ops
+        auto-backup first · everything is written to the session evidence log. Hardware paths are
+        real but untested on physical devices — mock mode is clearly labelled.
       </footer>
     </div>
   );

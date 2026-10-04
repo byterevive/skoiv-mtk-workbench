@@ -21,12 +21,15 @@ Read, inspect, understand, and back up.
 
 ## 0.2 — Modify Safely
 
-- Controlled writes
-- Safety-engine gating
-- Mandatory pre-write review for risky operations
-- Backup requirements
-- Read-back verification
-- Boot-critical operation protections
+- Controlled writes — **implemented** (plan → confirm token → execute; `partition.write|erase`, patch/IMEI/seccfg/vbmeta ops)
+- Safety-engine gating — **implemented** (risk classes green/yellow/red, boot-critical escalation, attestation + typed CONFIRM for red ops)
+- Mandatory pre-write review for risky operations — **implemented** (two-phase plan/confirm dialog bound to exact parameters)
+- Backup requirements — **implemented** (auto-backup of affected partitions before every mutation; `backups/` with SHA-256 manifests)
+- Read-back verification — **implemented** (post-write read-back + hash compare, session JSONL evidence log)
+- Boot-critical operation protections — **implemented** (boot-critical targets escalate to red)
+- Patch Modem / Patch Cert (md1img modulus swap) — **implemented** (hardware path untested)
+- IMEI read/write (nvdata NVItems) — **implemented** (hardware path untested)
+- Flash tool (scatter images, staged flash) — pending
 
 ## 0.3 — Knowledge
 

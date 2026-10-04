@@ -13,7 +13,8 @@ import uuid
 import zlib
 from typing import Any
 
-from .base import DetectedDevice, DeviceAdapter, RawDiskImage
+from .base import AdapterError, DetectedDevice, DeviceAdapter, RawDiskImage
+from ..patching import VENDOR_MODULUS_XIAOMI
 
 SECTOR = 512
 
@@ -22,6 +23,7 @@ _MOCK_LAYOUT: list[tuple[str, str, int, int]] = [
     ("preloader", "2568845d-2332-4675-bc39-8fa5a4748d15", 4, 0),
     ("pgpt", "c12a7328-f81f-11d2-ba4b-00a0c93ec93b", 2, 0),
     ("proinfo", "ebd0a0a2-b9e5-4433-87c0-68b6b72699c7", 3, 0),
+    ("nvdata", "ebd0a0a2-b9e5-4433-87c0-68b6b72699c7", 20, 0),
     ("nvram", "ebd0a0a2-b9e5-4433-87c0-68b6b72699c7", 64, 0),
     ("protect1", "ebd0a0a2-b9e5-4433-87c0-68b6b72699c7", 8, 0),
     ("protect2", "ebd0a0a2-b9e5-4433-87c0-68b6b72699c7", 8, 0),
@@ -122,6 +124,9 @@ class MockAdapter(DeviceAdapter):
 
     def __init__(self) -> None:
         self._image: bytes | None = None
+        self._store: dict[str, bytes] = {}
+        self._seccfg: int | None = None
+        self._imei: tuple[str | None, str | None] | None = None
 
     def info(self) -> dict[str, Any]:
         return {
@@ -155,3 +160,72 @@ class MockAdapter(DeviceAdapter):
             sector_size=SECTOR,
             meta={"adapter": self.name, "start_lba": start_lba, "sector_count": sector_count},
         )
+
+    # -- partition store (fixture device state) ---------------------------
+
+    def _partition_names(self) -> list[str]:
+        return [name for name, _t, _s, _a in _MOCK_LAYOUT]
+
+    def _fixture_content(self, name: str) -> bytes:
+        key = name.lower()
+        if key.startswith("md1img"):
+            # Synthetic modem image embedding the vendor cert modulus so the
+            # patch_modem workflow is exercisable without hardware.
+            return b"MD1FIXTURE" + b"\x00" * 64 + VENDOR_MODULUS_XIAOMI + b"\x00" * 128
+        if key.startswith("vbmeta"):
+            vb = bytearray(256)
+            vb[0:4] = b"AVB0"
+            return bytes(vb) + b"\x00" * 256
+        if key == "nvdata":
+            return b"\x00" * 256 + b"\x4C\x44\x49\x00\x10\xEF\x0A\x00\x0A" + b"\x00" * 512
+        # Deterministic compact placeholder (fixture stores never materialize
+        # multi-GiB partitions).
+        seed = sum(name.encode()) % 251
+        return bytes((seed + i) % 256 for i in range(256)) * 64
+
+    def _store_get(self, name: str) -> bytes:
+        key = name.lower()
+        if key not in self._store:
+            if key not in self._partition_names():
+                raise AdapterError(f"unknown partition: {name}")
+            self._store[key] = self._fixture_content(key)
+        return self._store[key]
+
+    def read_partition(self, name: str) -> RawDiskImage:
+        data = self._store_get(name)
+        return RawDiskImage(
+            data=data,
+            source="mock:fixture",
+            sector_size=SECTOR,
+            meta={"adapter": self.name, "partition": name.lower(), "fixture": True},
+        )
+
+    def write_partition(self, name: str, data: bytes) -> None:
+        key = name.lower()
+        if key not in self._partition_names():
+            raise AdapterError(f"unknown partition: {name}")
+        self._store[key] = bytes(data)
+
+    def erase_partition(self, name: str) -> None:
+        key = name.lower()
+        if key not in self._partition_names():
+            raise AdapterError(f"unknown partition: {name}")
+        self._store[key] = b"\x00" * 256
+
+    def seccfg_set(self, lockflag: int) -> str:
+        self._seccfg = int(lockflag)
+        return f"seccfg lockflag set to {lockflag}"
+
+    def imei_read(self) -> dict:
+        return {
+            "imei1": "490154203237518",
+            "imei2": "356938035643809",
+            "all_imeis": ["490154203237518", "356938035643809"],
+            "source": "mock:fixture",
+            "luhn_valid": [True, True],
+            "note": "fixture IMEIs (standard Luhn-valid test values)",
+        }
+
+    def imei_write(self, imei1: str, imei2: str | None = None) -> dict:
+        self._imei = (imei1, imei2)
+        return {"written": {"imei1": imei1, "imei2": imei2}, "verified": True, "source": "mock:fixture"}

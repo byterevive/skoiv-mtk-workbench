@@ -427,3 +427,130 @@ td.num {
   line-height: 1.6;
   background: rgba(10, 18, 33, 0.6);
 }
+
+/* ---------- service + backup panels ---------- */
+
+.op-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 6px 10px;
+  margin-bottom: 4px;
+  background: var(--bg-panel-2);
+  color: inherit;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.op-item:hover {
+  border-color: var(--border);
+}
+
+.op-item.active {
+  border-color: var(--accent, #4a7dbd);
+  background: #16233d;
+}
+
+.field {
+  display: block;
+  margin: 8px 0;
+  font-size: 12px;
+}
+
+.field span {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--muted, #8b98ad);
+}
+
+.field input {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border, #2a3550);
+  background: var(--bg-panel-2);
+  color: inherit;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
+.check {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 12px;
+  margin: 10px 0;
+  cursor: pointer;
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 8, 18, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.dialog {
+  width: min(560px, 92vw);
+  max-height: 84vh;
+  overflow: auto;
+  background: var(--bg-panel, #111a2e);
+  border: 1px solid var(--border, #2a3550);
+  border-radius: 10px;
+  padding: 18px 20px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
+}
+
+.error-box {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px solid #cf222e;
+  border-radius: 6px;
+  background: rgba(207, 34, 46, 0.12);
+  color: #ff9ba2;
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
+.result-box {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border, #2a3550);
+  border-radius: 6px;
+  background: var(--bg-panel-2);
+  font-size: 12px;
+}
+
+.result-box pre {
+  margin: 6px 0 0;
+  max-height: 240px;
+  overflow: auto;
+  font-size: 11px;
+}
+
+.btn.secondary {
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border, #2a3550);
+}
+
+.attest-box {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid #9a6700;
+  border-radius: 8px;
+  background: rgba(154, 103, 0, 0.12);
+}

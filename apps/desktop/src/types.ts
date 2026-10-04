@@ -73,6 +73,72 @@ export interface WorkerEventMsg {
   data: Record<string, unknown>;
 }
 
+/** Two-phase operation engine (plan -> confirm -> execute). */
+
+export interface OpChange {
+  partition?: string;
+  action: string;
+  source?: string;
+  [key: string]: unknown;
+}
+
+export interface OpPlan {
+  op: string;
+  risk: Risk;
+  summary: string;
+  changes: OpChange[];
+  backup_partitions: string[];
+  preconditions: Record<string, unknown>[];
+  requires_attestation: boolean;
+  params_digest: string;
+  created: number;
+}
+
+export interface PlanResponse {
+  phase: "plan";
+  plan: OpPlan;
+  confirm_token: string;
+}
+
+export interface MutationResult {
+  phase: "executed";
+  op: string;
+  risk: Risk;
+  backup_id: string | null;
+  verified?: boolean;
+  [key: string]: unknown;
+}
+
+export interface BackupPartitionEntry {
+  file: string;
+  size: number;
+  sha256: string;
+}
+
+export interface BackupManifest {
+  backup_id: string;
+  created: number;
+  adapter: string;
+  source: string;
+  note: string;
+  partitions: Record<string, BackupPartitionEntry>;
+}
+
+export interface ServiceOpField {
+  name: string;
+  label: string;
+  def: string;
+  placeholder?: string;
+}
+
+export interface ServiceOpDef {
+  method: string;
+  title: string;
+  description: string;
+  fields: ServiceOpField[];
+  readOnly?: boolean;
+}
+
 export interface LogEntry {
   id: number;
   ts: number;

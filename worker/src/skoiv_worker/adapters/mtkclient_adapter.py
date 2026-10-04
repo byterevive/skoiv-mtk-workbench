@@ -264,3 +264,159 @@ class MtkClientAdapter(DeviceAdapter):
                     close()
             except Exception:  # noqa: BLE001 - never fail during cleanup
                 pass
+
+    # -- shared DA plumbing -----------------------------------------------
+
+    def _da_call(self, fn, timeout: int = 300):
+        """Run fn(da_handler, mtk) inside one ephemeral DA session, with timeout."""
+        if not self.detect():
+            raise AdapterError(
+                "no MediaTek target detected. Connect the device in BROM/preloader mode first."
+            )
+        from concurrent.futures import ThreadPoolExecutor  # noqa: PLC0415
+
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(self._da_call_blocking, fn)
+            try:
+                return future.result(timeout=timeout)
+            except TimeoutError as exc:
+                raise AdapterError(f"device operation timed out after {timeout}s") from exc
+
+    def _da_call_blocking(self, fn):
+        MtkConfig, Mtk, DaHandler = _import_mtkclient()
+        _ensure_libusb()
+        config = MtkConfig(loglevel=self._loglevel, gui=None, guiprogress=None)
+        mtk = Mtk(config=config, loglevel=self._loglevel, serialportname=None)
+        da_handler = DaHandler(mtk, self._loglevel)
+        try:
+            mtk = da_handler.connect(mtk, ".")
+            if mtk is None:
+                raise AdapterError("device handshake failed (is a MediaTek target connected?)")
+            mtk = da_handler.configure_da(mtk)
+            return fn(da_handler, mtk)
+        except AdapterError:
+            raise
+        except Exception as exc:  # noqa: BLE001 - normalize upstream failures
+            raise AdapterError(f"mtkclient operation failed: {exc}") from exc
+        finally:
+            try:
+                port = getattr(mtk, "port", None)
+                close = getattr(port, "close", None)
+                if callable(close):
+                    close()
+            except Exception:  # noqa: BLE001 - never fail during cleanup
+                pass
+
+    # -- partition level ---------------------------------------------------
+
+    def read_partition(self, name: str) -> RawDiskImage:
+        def op(da_handler, _mtk):
+            data = da_handler.da_read_partition(partitionname=name, display=False)
+            if not isinstance(data, (bytes, bytearray)) or len(data) == 0:
+                raise AdapterError(f"could not read partition {name!r}")
+            return RawDiskImage(
+                data=bytes(data),
+                source="device:mtkclient",
+                sector_size=int(getattr(da_handler.config, "pagesize", 512) or 512),
+                meta={"adapter": self.name, "partition": name.lower()},
+            )
+
+        return self._da_call(op)
+
+    def write_partition(self, name: str, data: bytes) -> None:
+        def op(da_handler, _mtk):
+            ok = da_handler.da_write_partition(partitionname=name, data=bytes(data), display=False)
+            if not ok:
+                raise AdapterError(f"write to partition {name!r} failed")
+
+        self._da_call(op)
+
+    def erase_partition(self, name: str) -> None:
+        def op(da_handler, _mtk):
+            da_handler.da_erase(partitions=[name], parttype="user")
+
+        self._da_call(op)
+
+    # -- servicing primitives ---------------------------------------------
+
+    def seccfg_set(self, lockflag: int) -> str:
+        def op(_da_handler, mtk):
+            result = mtk.daloader.seccfg(int(lockflag))
+            if isinstance(result, tuple) and len(result) == 2:
+                ok, msg = result
+                if not ok:
+                    raise AdapterError(str(msg))
+                return str(msg)
+            return f"seccfg set to {lockflag}"
+
+        return self._da_call(op)
+
+    def imei_read(self) -> dict:
+        from ..patching import (  # noqa: PLC0415
+            NVITEM_BLOCK_SIZE,
+            decode_nvitem_imeis,
+            find_nvitem_block,
+            is_luhn_valid,
+        )
+
+        def op(da_handler, mtk):
+            nvdata = da_handler.da_read_partition(partitionname="nvdata", display=False)
+            if not isinstance(nvdata, (bytes, bytearray)) or len(nvdata) == 0:
+                raise AdapterError("could not read nvdata")
+            pos = find_nvitem_block(bytes(nvdata))
+            if pos == -1:
+                raise AdapterError("no NVItem block found in nvdata")
+            block = bytes(nvdata[pos : pos + NVITEM_BLOCK_SIZE])
+            try:
+                otp = mtk.config.get_otp()
+            except Exception:  # noqa: BLE001
+                otp = None
+            result = mtk.daloader.nvitem(
+                data=block, encrypt=False, otp=otp, seed=None, aeskey=b"", display=False
+            )
+            imeis = decode_nvitem_imeis(bytes(result)) if isinstance(result, (bytes, bytearray)) else []
+            return {
+                "imei1": imeis[0] if imeis else None,
+                "imei2": imeis[1] if len(imeis) > 1 else None,
+                "all_imeis": imeis,
+                "source": "device:mtkclient",
+                "luhn_valid": [is_luhn_valid(i) for i in imeis],
+            }
+
+        return self._da_call(op)
+
+    def imei_write(self, imei1: str, imei2: str | None = None) -> dict:
+        from ..patching import (  # noqa: PLC0415
+            NVITEM_BLOCK_SIZE,
+            find_nvitem_block,
+            patch_nvitem_imeis,
+        )
+
+        def op(da_handler, mtk):
+            nvdata = bytearray(da_handler.da_read_partition(partitionname="nvdata", display=False))
+            if len(nvdata) == 0:
+                raise AdapterError("could not read nvdata")
+            pos = find_nvitem_block(bytes(nvdata))
+            if pos == -1:
+                raise AdapterError("no NVItem block found in nvdata")
+            block = bytes(nvdata[pos : pos + NVITEM_BLOCK_SIZE])
+            try:
+                otp = mtk.config.get_otp()
+            except Exception:  # noqa: BLE001
+                otp = None
+            plain = mtk.daloader.nvitem(data=block, encrypt=False, otp=otp, seed=None, aeskey=b"", display=False)
+            patched_plain = patch_nvitem_imeis(bytes(plain), imei1, imei2)
+            encrypted = mtk.daloader.nvitem(
+                data=patched_plain, encrypt=True, otp=otp, seed=None, aeskey=b"", display=False
+            )
+            if not isinstance(encrypted, (bytes, bytearray)) or len(encrypted) != NVITEM_BLOCK_SIZE:
+                raise AdapterError("nvitem encryption failed")
+            nvdata[pos : pos + NVITEM_BLOCK_SIZE] = encrypted
+            ok = da_handler.da_write_partition(partitionname="nvdata", data=bytes(nvdata), display=False)
+            if not ok:
+                raise AdapterError("nvdata write failed")
+            readback = da_handler.da_read_partition(partitionname="nvdata", display=False)
+            verified = bytes(readback[pos : pos + NVITEM_BLOCK_SIZE]) == bytes(encrypted)
+            return {"written": {"imei1": imei1, "imei2": imei2}, "verified": verified, "source": "device:mtkclient"}
+
+        return self._da_call(op)

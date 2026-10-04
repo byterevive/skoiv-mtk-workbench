@@ -59,6 +59,7 @@ RED_PREFIXES = ("preloader", "lk", "tee", "sspm", "spmfw", "gz", "mcupm", "md1")
 # Partitions that damage device identity / calibration if corrupted (yellow).
 YELLOW_EXACT = {
     "nvram",
+    "nvdata",
     "nvcfg",
     "proinfo",
     "protect1",
