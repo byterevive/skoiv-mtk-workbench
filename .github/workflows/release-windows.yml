@@ -13,6 +13,7 @@ on:
 
 permissions:
   contents: write
+  checks: write
 
 jobs:
   build-windows:
@@ -65,16 +66,35 @@ jobs:
         run: pnpm tauri build
 
       - name: Collect artifacts
-        shell: pwsh
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          New-Item -ItemType Directory -Force -Path release-out | Out-Null
-          Copy-Item "apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe" release-out/
-          Copy-Item worker/dist/skoiv-worker.exe release-out/
-          Get-ChildItem release-out | ForEach-Object {
-            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
-            "$hash  $($_.Name)"
-          } | Out-File -Encoding ascii release-out/SHA256SUMS.txt
-          Get-ChildItem release-out
+          set -uo pipefail
+          mkdir -p release-out
+          {
+            echo "== bundle tree =="
+            find apps/desktop/src-tauri/target/release/bundle -type f 2>/dev/null
+            echo "== worker dist =="
+            ls -la worker/dist 2>/dev/null
+          } | tee layout.txt
+
+          cp worker/dist/skoiv-worker.exe release-out/
+          SETUP=$(find apps/desktop/src-tauri/target/release/bundle -name "*-setup.exe" | head -1)
+          if [ -z "$SETUP" ]; then
+            echo "::error::NSIS installer (*-setup.exe) not found in bundle tree"
+            { echo '```'; cat layout.txt; echo '```'; } > diag.md
+            gh api "repos/${{ github.repository }}/check-runs" \
+              -f name="release-diagnostics" \
+              -f head_sha="${{ github.sha }}" \
+              -f status=completed -f conclusion=failure \
+              -f "output[title]=artifact collection failed" \
+              -F "output[summary]=@diag.md" || true
+            exit 1
+          fi
+          cp "$SETUP" release-out/
+          (cd release-out && sha256sum skoiv-worker.exe *-setup.exe > SHA256SUMS.txt)
+          ls -la release-out
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
