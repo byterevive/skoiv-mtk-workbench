@@ -21,6 +21,7 @@ apps/desktop/
 ```bash
 pnpm install          # repo root (pnpm workspace)
 pnpm dev              # Vite dev server on :5173 — full UI with browser mock transport
+node apps/desktop/scripts/ensure-sidecar-stub.mjs   # once: satisfies tauri-build's externalBin check
 pnpm tauri dev        # native shell (requires Rust toolchain + webkit2gtk on Linux)
 ```
 

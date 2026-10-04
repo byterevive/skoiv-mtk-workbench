@@ -66,6 +66,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Build frontend (generate_context embeds dist/)
         run: pnpm build
+      - name: Create stub worker sidecar (tauri-build validates externalBin)
+        run: node apps/desktop/scripts/ensure-sidecar-stub.mjs
       - name: cargo check
         working-directory: apps/desktop/src-tauri
         env:
